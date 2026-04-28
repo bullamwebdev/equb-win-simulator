@@ -2,259 +2,384 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Equb Win Simulator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>⬡ Equb Win Simulator</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <style>
-    *{box-sizing:border-box}body{margin:0;background:#0f172a;color:#e2e8f0;font-family:system-ui,sans-serif}
-    input[type=range]{-webkit-appearance:none;width:100%;height:5px;background:#334155;border-radius:3px;outline:none}
-    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;background:#818cf8;border-radius:50%;cursor:pointer}
-    .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px}
-    .tab{padding:8px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;transition:all .2s}
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    html,body{margin:0;padding:0;background:#0f172a;color:#e2e8f0;font-family:system-ui,-apple-system,sans-serif;overscroll-behavior:none}
+    input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;background:#334155;border-radius:3px;outline:none;cursor:pointer}
+    input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;background:#818cf8;border-radius:50%;cursor:pointer;border:2px solid #0f172a;box-shadow:0 0 0 3px rgba(129,140,248,0.2)}
+    input[type=range]::-moz-range-thumb{width:22px;height:22px;background:#818cf8;border-radius:50%;cursor:pointer;border:2px solid #0f172a}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:14px;padding:16px}
+    .tab{padding:8px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;transition:all .15s;white-space:nowrap;border:none;outline:none}
     .tab-on{background:#4f46e5;color:#fff}
     .tab-off{background:#1e293b;color:#94a3b8}
-    .tab-off:hover{background:#334155;color:#e2e8f0}
-    ::-webkit-scrollbar{width:6px;height:6px}
-    ::-webkit-scrollbar-track{background:#0f172a}
-    ::-webkit-scrollbar-thumb{background:#334155;border-radius:3px}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+    ::-webkit-scrollbar-thumb{background:#334155;border-radius:2px}
+    .drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:40;backdrop-filter:blur(2px)}
+    .drawer{position:fixed;left:0;top:0;bottom:0;width:min(300px,85vw);background:#0a0f1e;border-right:1px solid #1e293b;z-index:50;overflow-y:auto;padding:16px;transform:translateX(-100%);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+    .drawer.open{transform:translateX(0)}
+    .metric-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+    @media(min-width:640px){.metric-grid{grid-template-columns:repeat(4,1fr)}}
+    .chart-grid-2{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:700px){.chart-grid-2{grid-template-columns:1fr 1fr}}
+    button:active{transform:scale(0.97)}
+    .btn-run{width:100%;padding:13px 0;border-radius:10px;border:none;font-weight:700;font-size:14px;cursor:pointer;background:linear-gradient(90deg,#4f46e5,#7c3aed);color:#fff;transition:opacity .15s}
+    .btn-run:disabled{opacity:.5;cursor:wait}
+    .sidebar-desktop{width:272px;background:#0a0f1e;border-right:1px solid #1e293b;padding:16px;overflow-y:auto;flex-shrink:0;display:none}
+    @media(min-width:900px){.sidebar-desktop{display:block}}
+    .hamburger{display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;border:1px solid #334155;background:#1e293b;cursor:pointer;color:#e2e8f0;font-size:18px}
+    @media(min-width:900px){.hamburger{display:none}}
+    .fab{position:fixed;bottom:20px;right:20px;width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#4f46e5,#7c3aed);border:none;cursor:pointer;color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(79,70,229,0.4);z-index:30;transition:transform .15s}
+    .fab:active{transform:scale(0.92)}
+    @media(min-width:900px){.fab{display:none}}
   </style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const {useState,useEffect,useRef,useCallback}=React;
-function binomCoeff(n,k){if(k<0||k>n)return 0;if(k===0||k===n)return 1;let r=1;for(let i=0;i<k;i++){r=r*(n-i)/(i+1)}return r}
-function binomPMF(k,n,p){return binomCoeff(n,k)*Math.pow(p,k)*Math.pow(1-p,n-k)}
-function binomCDF(k,n,p){let s=0;for(let i=0;i<=k;i++)s+=binomPMF(i,n,p);return s}
-function binomPPF(q,n,p){let s=0;for(let k=0;k<=n;k++){s+=binomPMF(k,n,p);if(s>=q)return k}return n}
-const engine={
-  eFirstWin:(M,N)=>{let s=0;for(let k=0;k<N;k++)s+=Math.pow((N-k)/N,M);return s},
-  pWinRound1:(M,N)=>1-Math.pow(1-1/N,M),
-  pBreakeven:(M,N)=>{const km=Math.ceil(M/N);return 1-binomCDF(km-1,M,1/N)},
-  varRisk:(M,N,C)=>{const ec=C*N,prize=N*ec,w5=binomPPF(0.05,M,1/N);return w5*(prize-ec)+(M-w5)*(-ec)},
-  stratScore:(M,N)=>0.5*engine.pWinRound1(M,N)*100+0.5*engine.pBreakeven(M,N)*100,
-  winPMF:(M,N)=>{const p=1/N,out=[];for(let k=0;k<=Math.min(M,40);k++)out.push({k,p:binomPMF(k,M,p)});return out},
-  firstWinPMF:(M,N)=>{const out=[];for(let k=1;k<=N;k++)out.push({round:k,p:Math.pow((N-k+1)/N,M)-Math.pow((N-k)/N,M)});return out},
-  monteCarlo:(N,M,C,cycles,nSims)=>{
-    const R=cycles*N;const sims=[];
-    let s=42;const rand=()=>{s=(1664525*s+1013904223)&0xffffffff;return(s>>>0)/0xffffffff};
-    for(let i=0;i<nSims;i++){let w=M*C;const row=[w];for(let t=0;t<R;t++){let wins=0;for(let m=0;m<M;m++)if(rand()<1/N)wins++;w=w-M*C+wins*N*C;row.push(w)}sims.push(row)}
-    const mean=[],p10=[],p90=[];
-    for(let t=0;t<=R;t++){const col=sims.map(r=>r[t]).sort((a,b)=>a-b);mean.push(col.reduce((a,b)=>a+b,0)/nSims);p10.push(col[Math.floor(nSims*0.1)]);p90.push(col[Math.floor(nSims*0.9)])}
-    return{rounds:[...Array(R+1).keys()],mean,p10,p90,cycleBreaks:[...Array(cycles).keys()].map(i=>(i+1)*N)}
+const {useState,useEffect,useRef,useCallback,Fragment}=React;
+
+// ── MATH ENGINE ──────────────────────────────────────────────────────────────
+function bC(n,k){if(k<0||k>n)return 0;if(k===0||k===n)return 1;let r=1;for(let i=0;i<k;i++)r=r*(n-i)/(i+1);return r}
+function bPMF(k,n,p){return bC(n,k)*Math.pow(p,k)*Math.pow(1-p,n-k)}
+function bCDF(k,n,p){let s=0;for(let i=0;i<=k;i++)s+=bPMF(i,n,p);return s}
+function bPPF(q,n,p){let s=0;for(let k=0;k<=n;k++){s+=bPMF(k,n,p);if(s>=q)return k}return n}
+const E={
+  efw:(M,N)=>{let s=0;for(let k=0;k<N;k++)s+=Math.pow((N-k)/N,M);return s},
+  pwr1:(M,N)=>1-Math.pow(1-1/N,M),
+  pbe:(M,N)=>{const km=Math.ceil(M/N);return 1-bCDF(km-1,M,1/N)},
+  var95:(M,N,C)=>{const ec=C*N,pr=N*ec,w5=bPPF(0.05,M,1/N);return w5*(pr-ec)+(M-w5)*(-ec)},
+  score:(M,N)=>0.5*E.pwr1(M,N)*100+0.5*E.pbe(M,N)*100,
+  winPMF:(M,N)=>{const p=1/N,o=[];for(let k=0;k<=Math.min(M,40);k++)o.push({k,p:bPMF(k,M,p)});return o},
+  fwPMF:(M,N)=>{const o=[];for(let k=1;k<=N;k++)o.push({r:k,p:Math.pow((N-k+1)/N,M)-Math.pow((N-k)/N,M)});return o},
+  mc:(N,M,C,cy,ns)=>{
+    const R=cy*N,sims=[];let s=42;
+    const rnd=()=>{s=(1664525*s+1013904223)&0xffffffff;return(s>>>0)/0xffffffff};
+    for(let i=0;i<ns;i++){let w=M*C;const row=[w];for(let t=0;t<R;t++){let wins=0;for(let m=0;m<M;m++)if(rnd()<1/N)wins++;w=w-M*C+wins*N*C;row.push(w)}sims.push(row)}
+    const mn=[],p10=[],p90=[];
+    for(let t=0;t<=R;t++){const col=sims.map(r=>r[t]).sort((a,b)=>a-b);mn.push(col.reduce((a,b)=>a+b,0)/ns);p10.push(col[Math.floor(ns*.1)]);p90.push(col[Math.floor(ns*.9)])}
+    return{rounds:[...Array(R+1).keys()],mn,p10,p90,cb:[...Array(cy).keys()].map(i=>(i+1)*N)}
   },
-  optimize:(N,target,metric)=>{
-    const fn=metric==='p_win_round1'?(M=>engine.pWinRound1(M,N)*100):(M=>engine.pBreakeven(M,N)*100);
-    for(let M=1;M<=2000;M++)if(fn(M)>=target)return M;
+  opt:(N,tgt,met)=>{
+    const fn=met==='pwr1'?(M=>E.pwr1(M,N)*100):(M=>E.pbe(M,N)*100);
+    for(let M=1;M<=2000;M++)if(fn(M)>=tgt)return M;
     return 2000
   },
-  sweep:(Ns,Ms,C)=>{const rows=[];for(const n of Ns)for(const m of Ms)rows.push({N:n,M:m,pWR1:engine.pWinRound1(m,n)*100,pBE:engine.pBreakeven(m,n)*100,efw:engine.eFirstWin(m,n),score:engine.stratScore(m,n),var95:engine.varRisk(m,n,C)});return rows}
+  sweep:(Ns,Ms,C)=>{
+    const rows=[];
+    for(const n of Ns)for(const m of Ms)rows.push({N:n,M:m,pwr1:+(E.pwr1(m,n)*100).toFixed(1),pbe:+(E.pbe(m,n)*100).toFixed(1),efw:+E.efw(m,n).toFixed(3),score:+E.score(m,n).toFixed(1),var95:+(Math.abs(E.var95(m,n,C))/1000).toFixed(1)});
+    return rows
+  }
 };
-const COLORS=['#818cf8','#34d399','#fb923c','#f472b6','#60a5fa','#facc15','#a78bfa','#2dd4bf'];
-const PLOTLY_BASE={paper_bgcolor:'#0f172a',plot_bgcolor:'#0f172a',font:{color:'#e2e8f0',size:11},margin:{t:40,b:50,l:60,r:20},xaxis:{gridcolor:'#1e293b',zerolinecolor:'#334155'},yaxis:{gridcolor:'#1e293b',zerolinecolor:'#334155'},legend:{bgcolor:'rgba(0,0,0,0)'},colorway:COLORS};
-function MetricCard({label,value,unit='',color='#818cf8',sub}){
-  return <div style={{background:'linear-gradient(135deg,#1e293b,#0f172a)',border:'1px solid #334155',borderRadius:12,padding:'16px 20px'}}>
-    <div style={{fontSize:11,color:'#64748b',textTransform:'uppercase',letterSpacing:1,marginBottom:4}}>{label}</div>
-    <div style={{fontSize:26,fontWeight:700,color}}>{value}<span style={{fontSize:13,color:'#64748b',marginLeft:4}}>{unit}</span></div>
-    {sub&&<div style={{fontSize:11,color:'#64748b',marginTop:4}}>{sub}</div>}
+
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+const CL=['#818cf8','#34d399','#fb923c','#f472b6','#60a5fa','#facc15','#a78bfa','#2dd4bf'];
+const PB={paper_bgcolor:'#0f172a',plot_bgcolor:'#0f172a',font:{color:'#e2e8f0',size:11},
+  margin:{t:30,b:44,l:52,r:12},xaxis:{gridcolor:'#1e293b',zerolinecolor:'#334155',automargin:true},
+  yaxis:{gridcolor:'#1e293b',zerolinecolor:'#334155',automargin:true},
+  legend:{bgcolor:'rgba(0,0,0,0)',orientation:'h',y:1.12},colorway:CL};
+const sc=s=>s>=75?'#34d399':s>=60?'#fbbf24':'#f87171';
+const pc=p=>p>=90?'#34d399':p>=65?'#fbbf24':'#f87171';
+
+// ── COMPONENTS ───────────────────────────────────────────────────────────────
+function MCard({label,value,unit='',color='#818cf8',sub}){
+  return <div style={{background:'linear-gradient(135deg,#1e293b,#0f172a)',border:'1px solid #334155',borderRadius:12,padding:'14px 16px'}}>
+    <div style={{fontSize:10,color:'#64748b',textTransform:'uppercase',letterSpacing:.8,marginBottom:3}}>{label}</div>
+    <div style={{fontSize:24,fontWeight:700,color,lineHeight:1.1}}>{value}<span style={{fontSize:12,color:'#64748b',marginLeft:3}}>{unit}</span></div>
+    {sub&&<div style={{fontSize:10,color:'#64748b',marginTop:3}}>{sub}</div>}
   </div>
 }
+
 function Slider({label,min,max,value,step=1,onChange,fmt=v=>v}){
-  return <div style={{marginBottom:14}}>
-    <div style={{display:'flex',justifyContent:'space-between',marginBottom:5}}>
+  return <div style={{marginBottom:16}}>
+    <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
       <span style={{fontSize:12,color:'#94a3b8'}}>{label}</span>
-      <span style={{fontSize:12,fontWeight:600,color:'#818cf8'}}>{fmt(value)}</span>
+      <span style={{fontSize:12,fontWeight:700,color:'#818cf8'}}>{fmt(value)}</span>
     </div>
-    <input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(Number(e.target.value))}/>
+    <input type="range" min={min} max={max} step={step} value={value} onChange={e=>onChange(+e.target.value)}/>
   </div>
 }
+
 function Plot({data,layout}){
   const ref=useRef();
+  const key=useRef(0);
   useEffect(()=>{
     if(!ref.current)return;
-    Plotly.newPlot(ref.current,data,{...PLOTLY_BASE,...layout},{responsive:true,displayModeBar:false});
+    Plotly.newPlot(ref.current,data,{...PB,...layout},{responsive:true,displayModeBar:false});
     return()=>{try{Plotly.purge(ref.current)}catch(e){}}
-  },[JSON.stringify(data),JSON.stringify(layout)]);
-  return <div ref={ref} style={{width:'100%',minHeight:320}}/>
+  },[JSON.stringify({data,layout})]);
+  return <div ref={ref} style={{width:'100%',minHeight:260}}/>
 }
-const TABS=['📊 Distribution','💰 Wealth Sim','🎯 Strategy','⚡ Optimizer','📋 Data'];
+
+const TABS=['📊 Dist','💰 Wealth','🎯 Matrix','⚡ Optim','📋 Data'];
+const TABS_FULL=['Distribution','Wealth Sim','Strategy Matrix','Optimizer','Data Table'];
+
+// ── SIDEBAR CONTENT ───────────────────────────────────────────────────────────
+function SidebarContent({p,set,metrics,run,loading,onClose}){
+  const {N,M,C,cycles,nSims,target,metric}=p;
+  return <>
+    {onClose&&<div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+      <span style={{fontSize:13,fontWeight:700,color:'#818cf8'}}>⬡ Parameters</span>
+      <button onClick={onClose} style={{background:'none',border:'none',color:'#64748b',fontSize:20,cursor:'pointer',padding:'0 4px'}}>×</button>
+    </div>}
+    {!onClose&&<div style={{fontSize:10,color:'#475569',fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:14}}>⚙️ Parameters</div>}
+    <Slider label="Group Size (N)" min={2} max={50} value={N} onChange={set('N')} fmt={v=>v+' members'}/>
+    <Slider label="Raffles (M)" min={1} max={500} value={M} onChange={set('M')} fmt={v=>v+' raffles'}/>
+    <Slider label="Contribution (C)" min={10} max={5000} step={10} value={C} onChange={set('C')} fmt={v=>v+' units'}/>
+    <Slider label="Cycles" min={1} max={8} value={cycles} onChange={set('cycles')} fmt={v=>v+' cycles'}/>
+    <Slider label="MC Runs" min={200} max={3000} step={100} value={nSims} onChange={set('nSims')} fmt={v=>v.toLocaleString()}/>
+    <div style={{borderTop:'1px solid #1e293b',marginTop:4,paddingTop:14,marginBottom:14}}>
+      <div style={{fontSize:10,color:'#475569',fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>🎯 Optimizer</div>
+      <Slider label="Target Win Rate" min={51} max={99} value={target} onChange={set('target')} fmt={v=>v+'%'}/>
+      <div style={{display:'flex',gap:6,marginBottom:0}}>
+        {['pwr1','pbe'].map(m=><button key={m} onClick={()=>set('metric')(m)} style={{flex:1,padding:'7px 0',borderRadius:7,border:'none',cursor:'pointer',fontSize:11,fontWeight:600,background:metric===m?'#4f46e5':'#1e293b',color:metric===m?'#fff':'#64748b',transition:'all .15s'}}>{m==='pwr1'?'Win R1':'Break-even'}</button>)}
+      </div>
+    </div>
+    <button onClick={()=>{run();onClose&&onClose()}} disabled={loading} className="btn-run">
+      {loading?'⏳ Computing…':'▶ Run Simulation'}
+    </button>
+    <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:7}}>
+      {[['P(Win R1)',metrics.pwr1.toFixed(1)+'%',pc(metrics.pwr1)],
+        ['P(Break-even)',metrics.pbe.toFixed(1)+'%',pc(metrics.pbe)],
+        ['E[1st Win Rnd]',metrics.efw.toFixed(2),'#60a5fa'],
+        ['Score',metrics.score.toFixed(1)+'/100',sc(metrics.score)],
+        ['VaR 95%',(Math.abs(metrics.var95)/1000).toFixed(1)+'k C','#f87171'],
+      ].map(([l,v,c])=>
+        <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'#1e293b',borderRadius:8,padding:'8px 12px'}}>
+          <span style={{fontSize:11,color:'#64748b'}}>{l}</span>
+          <span style={{fontSize:13,fontWeight:700,color:c}}>{v}</span>
+        </div>
+      )}
+    </div>
+  </>
+}
+
+// ── MAIN APP ──────────────────────────────────────────────────────────────────
 function App(){
-  const [N,setN]=useState(10),[M,setM]=useState(50),[C,setC]=useState(100);
-  const [cycles,setCycles]=useState(3),[nSims,setNSims]=useState(800);
-  const [target,setTarget]=useState(90),[metric,setMetric]=useState('p_win_round1');
-  const [tab,setTab]=useState(0),[result,setResult]=useState(null),[loading,setLoading]=useState(false);
-  const pwr1=engine.pWinRound1(M,N)*100,pbe=engine.pBreakeven(M,N)*100;
-  const efw=engine.eFirstWin(M,N),score=engine.stratScore(M,N),var95=engine.varRisk(M,N,C);
-  const sc=s=>s>=75?'#34d399':s>=60?'#fbbf24':'#f87171';
-  const pc=p=>p>=90?'#34d399':p>=65?'#fbbf24':'#f87171';
+  const [p,setP]=useState({N:10,M:50,C:100,cycles:3,nSims:800,target:90,metric:'pwr1'});
+  const [tab,setTab]=useState(0);
+  const [result,setResult]=useState(null);
+  const [loading,setLoading]=useState(false);
+  const [drawerOpen,setDrawerOpen]=useState(false);
+  const set=k=>v=>setP(prev=>({...prev,[k]:v}));
+  const {N,M,C,cycles,nSims,target,metric}=p;
+  const metrics={pwr1:E.pwr1(M,N)*100,pbe:E.pbe(M,N)*100,efw:E.efw(M,N),score:E.score(M,N),var95:E.var95(M,N,C)};
+
   const run=useCallback(()=>{
     setLoading(true);
     setTimeout(()=>{
       try{
-        const mc=engine.monteCarlo(N,M,C,cycles,nSims);
-        const winPMF=engine.winPMF(M,N),fwPMF=engine.firstWinPMF(M,N);
-        const sweep=engine.sweep([5,10,20,50],[1,5,10,20,50,100,200,500,1000],C);
-        const optM=engine.optimize(N,target,metric);
+        const mc=E.mc(N,M,C,cycles,nSims);
+        const winPMF=E.winPMF(M,N),fwPMF=E.fwPMF(M,N);
+        const sweep=E.sweep([5,10,20,50],[1,5,10,20,50,100,200,500,1000],C);
+        const optM=E.opt(N,target,metric);
         setResult({mc,winPMF,fwPMF,sweep,optM});
-      }catch(e){console.error(e)}finally{setLoading(false)}
+      }catch(e){console.error(e);}
+      finally{setLoading(false)}
     },20)
   },[N,M,C,cycles,nSims,target,metric]);
+
   useEffect(()=>{run()},[]);
-  return <div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
-    <div style={{background:'linear-gradient(90deg,#1e1b4b,#0f172a)',borderBottom:'1px solid #334155',padding:'12px 20px',display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
-      <span style={{fontSize:20,fontWeight:800,background:'linear-gradient(90deg,#818cf8,#34d399)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>⬡ Equb Win Simulator</span>
-      <span style={{fontSize:11,color:'#475569'}}>Ethiopian ROSCA · N={N} members · M={M} raffles · C={C} units</span>
-    </div>
-    <div style={{display:'flex',flex:1,minHeight:0}}>
-      <div style={{width:260,background:'#0a0f1e',borderRight:'1px solid #1e293b',padding:16,overflowY:'auto',flexShrink:0}}>
-        <div style={{fontSize:10,color:'#475569',fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:12}}>⚙️ Parameters</div>
-        <Slider label="Group Size (N)" min={2} max={50} value={N} onChange={setN} fmt={v=>v+' mbr'}/>
-        <Slider label="Raffles (M)" min={1} max={500} value={M} onChange={setM} fmt={v=>v+' rfl'}/>
-        <Slider label="Contribution (C)" min={10} max={5000} step={10} value={C} onChange={setC} fmt={v=>v+' u'}/>
-        <Slider label="Cycles" min={1} max={8} value={cycles} onChange={setCycles}/>
-        <Slider label="MC Runs" min={200} max={3000} step={100} value={nSims} onChange={setNSims} fmt={v=>v.toLocaleString()}/>
-        <div style={{borderTop:'1px solid #1e293b',marginTop:4,paddingTop:14,marginBottom:14}}>
-          <div style={{fontSize:10,color:'#475569',fontWeight:700,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>🎯 Optimizer</div>
-          <Slider label="Target Win Rate" min={51} max={99} value={target} onChange={setTarget} fmt={v=>v+'%'}/>
-          <div style={{display:'flex',gap:6,marginBottom:12}}>
-            {['p_win_round1','p_breakeven'].map(m=><button key={m} onClick={()=>setMetric(m)} style={{flex:1,padding:'5px 0',borderRadius:6,border:'none',cursor:'pointer',fontSize:10,fontWeight:600,background:metric===m?'#4f46e5':'#1e293b',color:metric===m?'#fff':'#64748b'}}>{m==='p_win_round1'?'Win R1':'Break-even'}</button>)}
-          </div>
-        </div>
-        <button onClick={run} disabled={loading} style={{width:'100%',padding:'10px 0',borderRadius:8,border:'none',cursor:loading?'wait':'pointer',background:loading?'#1e293b':'linear-gradient(90deg,#4f46e5,#7c3aed)',color:'#fff',fontWeight:700,fontSize:13}}>
-          {loading?'⏳ Computing…':'▶ Run Simulation'}
-        </button>
-        <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:6}}>
-          {[['P(Win R1)',pwr1.toFixed(1)+'%',pc(pwr1)],['P(Break-even)',pbe.toFixed(1)+'%',pc(pbe)],['E[1st Win Rnd]',efw.toFixed(2),'#60a5fa'],['Score',score.toFixed(1)+'/100',sc(score)]].map(([l,v,c])=>
-            <div key={l} style={{display:'flex',justifyContent:'space-between',alignItems:'center',background:'#1e293b',borderRadius:6,padding:'6px 10px'}}>
-              <span style={{fontSize:10,color:'#64748b'}}>{l}</span>
-              <span style={{fontSize:12,fontWeight:700,color:c}}>{v}</span>
-            </div>
-          )}
-        </div>
+
+  const heatZ=[5,10,20,50].map(n=>[1,5,10,20,50,100,200,500,1000].map(m=>+(E.pwr1(m,n)*100).toFixed(1)));
+  const heatTxt=[5,10,20,50].map(n=>[1,5,10,20,50,100,200,500,1000].map(m=>(E.pwr1(m,n)*100).toFixed(0)+'%'));
+
+  return <div style={{height:'100dvh',display:'flex',flexDirection:'column',overflow:'hidden'}}>
+
+    {/* ── HEADER ── */}
+    <div style={{background:'linear-gradient(90deg,#1e1b4b,#0f172a)',borderBottom:'1px solid #1e293b',padding:'10px 16px',display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
+      <button className="hamburger" onClick={()=>setDrawerOpen(true)}>☰</button>
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{fontSize:17,fontWeight:800,background:'linear-gradient(90deg,#818cf8,#34d399)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>⬡ Equb Win Simulator</div>
+        <div style={{fontSize:10,color:'#475569',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>ROSCA Raffle · N={N} · M={M} · C={C}</div>
       </div>
-      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0}}>
-        <div style={{display:'flex',gap:4,padding:'10px 16px',borderBottom:'1px solid #1e293b',background:'#0f172a',overflowX:'auto'}}>
-          {TABS.map((t,i)=><button key={t} onClick={()=>setTab(i)} className={`tab ${tab===i?'tab-on':'tab-off'}`}>{t}</button>)}
+      <button onClick={run} disabled={loading} style={{flexShrink:0,padding:'7px 14px',borderRadius:8,border:'none',cursor:loading?'wait':'pointer',background:loading?'#334155':'linear-gradient(90deg,#4f46e5,#7c3aed)',color:'#fff',fontWeight:700,fontSize:12,whiteSpace:'nowrap'}}>
+        {loading?'⏳':'▶ Run'}
+      </button>
+    </div>
+
+    {/* ── MOBILE DRAWER OVERLAY ── */}
+    {drawerOpen&&<div className="drawer-overlay" onClick={()=>setDrawerOpen(false)}/>}
+    <div className={`drawer ${drawerOpen?'open':''}`}>
+      <SidebarContent p={p} set={set} metrics={metrics} run={run} loading={loading} onClose={()=>setDrawerOpen(false)}/>
+    </div>
+
+    {/* ── BODY ── */}
+    <div style={{display:'flex',flex:1,minHeight:0}}>
+
+      {/* DESKTOP SIDEBAR */}
+      <div className="sidebar-desktop">
+        <SidebarContent p={p} set={set} metrics={metrics} run={run} loading={loading}/>
+      </div>
+
+      {/* MAIN PANEL */}
+      <div style={{flex:1,display:'flex',flexDirection:'column',minWidth:0,overflow:'hidden'}}>
+
+        {/* TABS */}
+        <div style={{display:'flex',gap:5,padding:'8px 12px',borderBottom:'1px solid #1e293b',background:'#0f172a',overflowX:'auto',flexShrink:0}}>
+          {TABS.map((t,i)=><button key={t} onClick={()=>setTab(i)} className={`tab ${tab===i?'tab-on':'tab-off'}`}>
+            <span className="hidden sm:inline">{TABS_FULL[i]}</span>
+            <span className="sm:hidden">{t}</span>
+            {t}
+          </button>)}
         </div>
-        <div style={{flex:1,overflowY:'auto',padding:16}}>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:16}}>
-            <MetricCard label="P(Win Round 1)" value={pwr1.toFixed(1)} unit="%" color={pc(pwr1)} sub={`M=${M}, N=${N}`}/>
-            <MetricCard label="E[First Win]" value={efw.toFixed(2)} unit="rnd" color="#60a5fa" sub="Expected round"/>
-            <MetricCard label="Strategy Score" value={score.toFixed(1)} unit="/100" color={sc(score)} sub={score>=75?'✅ Optimal':'⚠️ Suboptimal'}/>
-            <MetricCard label="VaR 95%" value={(Math.abs(var95)/1000).toFixed(1)} unit="kC" color="#f87171" sub="Worst 5% loss"/>
+
+        {/* CONTENT */}
+        <div style={{flex:1,overflowY:'auto',padding:'12px 12px 72px'}}>
+
+          {/* METRICS ROW */}
+          <div className="metric-grid" style={{marginBottom:14}}>
+            <MCard label="P(Win Round 1)" value={metrics.pwr1.toFixed(1)} unit="%" color={pc(metrics.pwr1)} sub={`M=${M}, N=${N}`}/>
+            <MCard label="E[First Win]" value={metrics.efw.toFixed(2)} unit="rnd" color="#60a5fa" sub="Expected round"/>
+            <MCard label="Strategy Score" value={metrics.score.toFixed(1)} unit="/100" color={sc(metrics.score)} sub={metrics.score>=75?'✅ Optimal':'⚠️ Sub-opt'}/>
+            <MCard label="VaR 95%" value={(Math.abs(metrics.var95)/1000).toFixed(1)} unit="kC" color="#f87171" sub="Worst 5%"/>
           </div>
-          {!result&&<div style={{textAlign:'center',color:'#475569',marginTop:80,fontSize:15}}>▶ Click Run Simulation to generate charts</div>}
+
+          {!result&&<div style={{textAlign:'center',color:'#475569',marginTop:60,fontSize:15,lineHeight:2}}>
+            ▶ Tap Run to generate charts<br/>
+            <span style={{fontSize:12}}>Open ☰ to adjust parameters</span>
+          </div>}
+
           {result&&<>
-            {tab===0&&<div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
-              <div className="card"><div style={{fontWeight:700,marginBottom:10,fontSize:13}}>Win Count Distribution</div>
-                <Plot data={[{type:'bar',x:result.winPMF.map(d=>d.k),y:result.winPMF.map(d=>d.p),marker:{color:'#818cf8'}}]} layout={{xaxis:{title:{text:'Wins'}},yaxis:{title:{text:'Prob'}}}}/>
+
+            {/* TAB 0 — DISTRIBUTION */}
+            {tab===0&&<div className="chart-grid-2">
+              <div className="card">
+                <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>Win Count Distribution</div>
+                <Plot data={[{type:'bar',x:result.winPMF.map(d=>d.k),y:result.winPMF.map(d=>d.p),marker:{color:'#818cf8',opacity:.9},name:'P(wins=k)'}]}
+                  layout={{xaxis:{title:{text:'Wins'}},yaxis:{title:{text:'Prob'}}}}/>
               </div>
-              <div className="card"><div style={{fontWeight:700,marginBottom:10,fontSize:13}}>First Win Round PMF</div>
-                <Plot data={[{type:'bar',x:result.fwPMF.map(d=>d.round),y:result.fwPMF.map(d=>d.p),marker:{color:'#34d399'}}]} layout={{xaxis:{title:{text:'Round'}},yaxis:{title:{text:'Prob'}}}}/>
+              <div className="card">
+                <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>First Win Round PMF</div>
+                <Plot data={[{type:'bar',x:result.fwPMF.map(d=>d.r),y:result.fwPMF.map(d=>d.p),marker:{color:'#34d399',opacity:.9},name:'P(first win rnd k)'}]}
+                  layout={{xaxis:{title:{text:'Round'}},yaxis:{title:{text:'Prob'}}}}/>
               </div>
-              <div className="card" style={{gridColumn:'span 2'}}>
-                <div style={{fontWeight:700,marginBottom:10,fontSize:13}}>Win Rate Heatmap — P(Win Round 1) by N × M</div>
-                <Plot
-                  data={[{type:'heatmap',
-                    z:[5,10,20,50].map(n=>[1,5,10,20,50,100,200,500,1000].map(m=>+(engine.pWinRound1(m,n)*100).toFixed(1))),
-                    x:['1','5','10','20','50','100','200','500','1k'],
-                    y:['N=5','N=10','N=20','N=50'],
-                    colorscale:'Viridis',
-                    text:[5,10,20,50].map(n=>[1,5,10,20,50,100,200,500,1000].map(m=>(engine.pWinRound1(m,n)*100).toFixed(0)+'%')),
-                    texttemplate:'%{text}',textfont:{size:10}
-                  }]}
-                  layout={{xaxis:{title:{text:'Raffles M'}},yaxis:{title:{text:'Group N'}}}}
-                />
+              <div className="card" style={{gridColumn:'1 / -1'}}>
+                <div style={{fontWeight:700,marginBottom:8,fontSize:13}}>Win Rate Heatmap — P(Win R1) % by N × M</div>
+                <Plot data={[{type:'heatmap',z:heatZ,x:['1','5','10','20','50','100','200','500','1k'],y:['N=5','N=10','N=20','N=50'],
+                  colorscale:'Viridis',text:heatTxt,texttemplate:'%{text}',textfont:{size:9}}]}
+                  layout={{xaxis:{title:{text:'Raffles M'}},yaxis:{title:{text:'Group N'}}}}/>
               </div>
             </div>}
+
+            {/* TAB 1 — WEALTH */}
             {tab===1&&<div className="card">
-              <div style={{fontWeight:700,marginBottom:4,fontSize:13}}>Cascade Wealth — {nSims.toLocaleString()} Monte Carlo Runs</div>
-              <div style={{fontSize:11,color:'#64748b',marginBottom:10}}>Shaded = 10th–90th percentile band · Dotted = cycle boundaries</div>
+              <div style={{fontWeight:700,marginBottom:3,fontSize:13}}>Cascade Wealth — {nSims.toLocaleString()} Monte Carlo Runs</div>
+              <div style={{fontSize:11,color:'#64748b',marginBottom:10}}>Shaded = 10th–90th percentile · Dotted = cycle end</div>
               <Plot
                 data={[
-                  {x:result.mc.rounds,y:result.mc.p90,type:'scatter',line:{color:'rgba(0,0,0,0)'},fill:'tonexty',fillcolor:'rgba(129,140,248,0.07)',showlegend:false,name:'Band'},
-                  {x:result.mc.rounds,y:result.mc.mean,type:'scatter',mode:'lines',line:{color:'#818cf8',width:2.5},name:'Mean',fill:'tonexty',fillcolor:'rgba(129,140,248,0.07)'},
-                  {x:result.mc.rounds,y:result.mc.p10,type:'scatter',mode:'lines',line:{color:'rgba(129,140,248,0.35)',width:1,dash:'dot'},name:'P10'},
-                  {x:result.mc.rounds,y:result.mc.p90,type:'scatter',mode:'lines',line:{color:'rgba(129,140,248,0.35)',width:1,dash:'dot'},name:'P90'},
+                  {x:result.mc.rounds,y:result.mc.p90,type:'scatter',line:{color:'rgba(0,0,0,0)'},fill:'tonexty',fillcolor:'rgba(129,140,248,0.07)',showlegend:false},
+                  {x:result.mc.rounds,y:result.mc.mn,type:'scatter',mode:'lines',line:{color:'#818cf8',width:2.5},name:'Mean',fill:'tonexty',fillcolor:'rgba(129,140,248,0.07)'},
+                  {x:result.mc.rounds,y:result.mc.p10,type:'scatter',mode:'lines',line:{color:'rgba(129,140,248,0.4)',width:1,dash:'dot'},name:'P10'},
+                  {x:result.mc.rounds,y:result.mc.p90,type:'scatter',mode:'lines',line:{color:'rgba(129,140,248,0.4)',width:1,dash:'dot'},name:'P90'},
                 ]}
                 layout={{
-                  xaxis:{title:{text:'Round'}},yaxis:{title:{text:'Capital'}},
-                  shapes:result.mc.cycleBreaks.map(cb=>({type:'line',x0:cb,x1:cb,y0:0,y1:1,yref:'paper',line:{color:'#334155',dash:'dot',width:1}})),
-                  annotations:result.mc.cycleBreaks.map((cb,i)=>({x:cb,y:0.97,yref:'paper',text:'C'+(i+2),showarrow:false,font:{size:9,color:'#64748b'}}))
+                  xaxis:{title:{text:'Round'}},yaxis:{title:{text:'Capital (units)'}},
+                  shapes:result.mc.cb.map(cb=>({type:'line',x0:cb,x1:cb,y0:0,y1:1,yref:'paper',line:{color:'#334155',dash:'dot',width:1}})),
+                  annotations:result.mc.cb.map((cb,i)=>({x:cb,y:.97,yref:'paper',text:'C'+(i+2),showarrow:false,font:{size:9,color:'#64748b'}}))
                 }}
               />
             </div>}
+
+            {/* TAB 2 — STRATEGY MATRIX */}
             {tab===2&&<div className="card">
-              <div style={{fontWeight:700,marginBottom:4,fontSize:13}}>Strategy ROI Matrix — N={N}</div>
-              <div style={{fontSize:11,color:'#64748b',marginBottom:10}}>Bubble = VaR95 risk · Color = Strategy Score · X = M (log scale)</div>
+              <div style={{fontWeight:700,marginBottom:3,fontSize:13}}>Strategy ROI Matrix — N={N}</div>
+              <div style={{fontSize:11,color:'#64748b',marginBottom:10}}>Bubble = VaR95 · Color = Score · X = M (log)</div>
               <Plot
                 data={[{type:'scatter',
                   x:[1,5,10,20,50,100,200,500,1000],
-                  y:[1,5,10,20,50,100,200,500,1000].map(m=>engine.pWinRound1(m,N)*100),
+                  y:[1,5,10,20,50,100,200,500,1000].map(m=>E.pwr1(m,N)*100),
                   mode:'markers+text',
                   text:[1,5,10,20,50,100,200,500,1000].map(m=>'M='+m),
                   textposition:'top center',textfont:{size:9},
-                  marker:{size:[1,5,10,20,50,100,200,500,1000].map(m=>Math.min(50,Math.sqrt(Math.abs(engine.varRisk(m,N,C))/C)+6)),
-                    color:[1,5,10,20,50,100,200,500,1000].map(m=>engine.stratScore(m,N)),
-                    colorscale:'RdYlGn',showscale:true,colorbar:{title:'Score'},line:{width:1,color:'rgba(255,255,255,0.15)'}}
+                  marker:{
+                    size:[1,5,10,20,50,100,200,500,1000].map(m=>Math.min(50,Math.sqrt(Math.abs(E.var95(m,N,C))/C)+6)),
+                    color:[1,5,10,20,50,100,200,500,1000].map(m=>E.score(m,N)),
+                    colorscale:'RdYlGn',showscale:true,colorbar:{title:'Score',titleside:'right'},
+                    line:{width:1,color:'rgba(255,255,255,0.15)'}
+                  }
                 }]}
                 layout={{xaxis:{type:'log',title:{text:'Raffles M'},tickvals:[1,5,10,50,100,500,1000],ticktext:['1','5','10','50','100','500','1k']},yaxis:{title:{text:'P(Win R1)%'}}}}
               />
             </div>}
-            {tab===3&&<div style={{display:'flex',flexDirection:'column',gap:14,maxWidth:580,margin:'0 auto'}}>
+
+            {/* TAB 3 — OPTIMIZER */}
+            {tab===3&&<div style={{display:'flex',flexDirection:'column',gap:12,maxWidth:540,margin:'0 auto'}}>
               <div className="card" style={{textAlign:'center'}}>
-                <div style={{fontSize:12,color:'#64748b',marginBottom:6}}>Optimal Portfolio Size for {target}% target</div>
-                <div style={{fontSize:72,fontWeight:900,lineHeight:1,background:'linear-gradient(90deg,#818cf8,#34d399)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>M={result.optM}</div>
-                <div style={{fontSize:12,color:'#475569',marginTop:6}}>Metric: {metric==='p_win_round1'?'P(Win Round 1)':'Break-even Prob'} · Group N={N}</div>
+                <div style={{fontSize:11,color:'#64748b',marginBottom:4}}>Optimal Portfolio for {target}% target</div>
+                <div style={{fontSize:clamp(52,10,80),fontWeight:900,lineHeight:1,background:'linear-gradient(90deg,#818cf8,#34d399)',WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>M = {result.optM}</div>
+                <div style={{fontSize:11,color:'#475569',marginTop:6}}>{metric==='pwr1'?'P(Win Round 1)':'Break-even Prob'} · Group N={N}</div>
               </div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-                <MetricCard label="Achieved" value={Math.round((metric==='p_win_round1'?engine.pWinRound1(result.optM,N):engine.pBreakeven(result.optM,N))*100)} unit="%" color="#34d399"/>
-                <MetricCard label="Score" value={engine.stratScore(result.optM,N).toFixed(1)} unit="/100" color={sc(engine.stratScore(result.optM,N))}/>
-                <MetricCard label="E[1st Win]" value={engine.eFirstWin(result.optM,N).toFixed(2)} unit="rnd" color="#60a5fa"/>
+                <MCard label="Achieved" value={Math.round((metric==='pwr1'?E.pwr1(result.optM,N):E.pbe(result.optM,N))*100)} unit="%" color="#34d399"/>
+                <MCard label="Score" value={E.score(result.optM,N).toFixed(1)} unit="/100" color={sc(E.score(result.optM,N))}/>
+                <MCard label="E[1st Win]" value={E.efw(result.optM,N).toFixed(2)} unit="rnd" color="#60a5fa"/>
               </div>
               <div className="card">
                 <div style={{fontWeight:700,fontSize:13,marginBottom:10}}>Strategy Zones</div>
-                {[['🟡 Conservative','M = N',N,'Moderate rate, low risk'],['🟢 Optimal','M = 4–5×N',N*5,'Peak score — recommended'],['🔴 Aggressive','M = 10×N',N*10,'Max speed, high exposure']].map(([z,f,m,d])=>
-                  <div key={z} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'9px 12px',borderRadius:8,background:result.optM===m?'rgba(79,70,229,0.15)':'rgba(255,255,255,0.02)',border:result.optM===m?'1px solid #4f46e5':'1px solid #1e293b'}}>
-                    <div style={{flex:1}}><div style={{fontWeight:600,fontSize:12}}>{z} <span style={{color:'#4f46e5',fontSize:10}}>{f}</span></div><div style={{fontSize:10,color:'#64748b'}}>{d}</div></div>
-                    <div style={{fontWeight:700,color:'#818cf8',fontSize:12}}>M={m}</div>
+                {[['🟡 Conservative','M = N',N,'Moderate win rate, low risk'],
+                  ['🟢 Optimal','M = 4–5×N',N*5,'Peak strategy score — recommended'],
+                  ['🔴 Aggressive','M = 10×N',N*10,'Max speed, high capital exposure']
+                ].map(([zone,formula,m,desc])=>
+                  <div key={zone} style={{display:'flex',alignItems:'center',gap:10,marginBottom:8,padding:'10px 12px',borderRadius:8,
+                    background:result.optM===m?'rgba(79,70,229,0.15)':'rgba(255,255,255,0.02)',
+                    border:result.optM===m?'1px solid #4f46e5':'1px solid #1e293b'}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:600,fontSize:12}}>{zone} <span style={{color:'#4f46e5',fontSize:10}}>{formula}</span></div>
+                      <div style={{fontSize:10,color:'#64748b'}}>{desc}</div>
+                    </div>
+                    <div style={{fontWeight:700,color:'#818cf8',fontSize:12,whiteSpace:'nowrap'}}>M={m}</div>
                   </div>
                 )}
               </div>
             </div>}
+
+            {/* TAB 4 — DATA */}
             {tab===4&&<div className="card" style={{overflowX:'auto'}}>
               <div style={{fontWeight:700,marginBottom:10,fontSize:13}}>Full Parameter Sweep — {result.sweep.length} scenarios</div>
-              <table style={{width:'100%',borderCollapse:'collapse',fontSize:11}}>
+              <table style={{width:'100%',borderCollapse:'collapse',fontSize:11,minWidth:420}}>
                 <thead><tr style={{background:'#0f172a'}}>
-                  {['N','M','P(Win R1)%','P(BE)%','E[1stWin]','Score','VaR95'].map(h=><th key={h} style={{padding:'7px 10px',textAlign:'left',color:'#64748b',fontWeight:600,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>)}
+                  {['N','M','P(WR1)%','P(BE)%','E[FW]','Score','VaR'].map(h=>
+                    <th key={h} style={{padding:'7px 8px',textAlign:'left',color:'#64748b',fontWeight:600,borderBottom:'1px solid #1e293b',whiteSpace:'nowrap'}}>{h}</th>)}
                 </tr></thead>
                 <tbody>{result.sweep.map((r,i)=>
-                  <tr key={i} style={{borderBottom:'1px solid #0f172a',background:r.N===N&&r.M===M?'rgba(79,70,229,0.1)':'transparent'}}>
-                    <td style={{padding:'6px 10px',color:'#64748b'}}>{r.N}</td>
-                    <td style={{padding:'6px 10px',color:'#e2e8f0',fontWeight:600}}>{r.M}</td>
-                    <td style={{padding:'6px 10px',color:pc(r.pWR1)}}>{r.pWR1.toFixed(1)}%</td>
-                    <td style={{padding:'6px 10px',color:pc(r.pBE)}}>{r.pBE.toFixed(1)}%</td>
-                    <td style={{padding:'6px 10px',color:'#60a5fa'}}>{r.efw.toFixed(3)}</td>
-                    <td style={{padding:'6px 10px',color:sc(r.score)}}>{r.score.toFixed(1)}</td>
-                    <td style={{padding:'6px 10px',color:'#f87171'}}>{(Math.abs(r.var95)/1000).toFixed(1)}k</td>
-                  </tr>
-                )}</tbody>
+                  <tr key={i} style={{borderBottom:'1px solid #0f172a',background:r.N===N&&r.M===M?'rgba(79,70,229,0.12)':'transparent'}}>
+                    <td style={{padding:'6px 8px',color:'#64748b'}}>{r.N}</td>
+                    <td style={{padding:'6px 8px',color:'#e2e8f0',fontWeight:600}}>{r.M}</td>
+                    <td style={{padding:'6px 8px',color:pc(r.pwr1)}}>{r.pwr1}%</td>
+                    <td style={{padding:'6px 8px',color:pc(r.pbe)}}>{r.pbe}%</td>
+                    <td style={{padding:'6px 8px',color:'#60a5fa'}}>{r.efw}</td>
+                    <td style={{padding:'6px 8px',color:sc(r.score)}}>{r.score}</td>
+                    <td style={{padding:'6px 8px',color:'#f87171'}}>{r.var95}k</td>
+                  </tr>)}
+                </tbody>
               </table>
             </div>}
           </>}
         </div>
       </div>
     </div>
-    <div style={{background:'#0a0f1e',borderTop:'1px solid #1e293b',padding:'6px 20px',fontSize:10,color:'#1e293b',display:'flex',justifyContent:'space-between'}}>
-      <span style={{color:'#334155'}}>Equb Win Simulator · Ethiopian ROSCA · 100% in-browser</span>
-      <span style={{color:'#334155'}}>N={N} · M={M} · C={C}</span>
+
+    {/* FAB — mobile run button */}
+    <button className="fab" onClick={()=>setDrawerOpen(true)} title="Open parameters">⚙️</button>
+
+    {/* FOOTER */}
+    <div style={{background:'#0a0f1e',borderTop:'1px solid #1e293b',padding:'5px 16px',fontSize:10,color:'#334155',display:'flex',justifyContent:'space-between',flexShrink:0}}>
+      <span>Equb Win Simulator · ROSCA · In-browser</span>
+      <span>N={N} · M={M} · C={C}</span>
     </div>
   </div>
 }
+
+function clamp(val,min,max){return Math.min(max,Math.max(min,val))}
+
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
